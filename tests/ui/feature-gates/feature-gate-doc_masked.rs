@@ -4,5 +4,6 @@ extern crate std as realstd;
 fn main() {
     #[doc(masked)]
     //~^ ERROR the `doc(masked)` attribute is experimental [E0658]
+    //~| WARN this attribute can only be applied to an `extern crate` item
     println!();
 }

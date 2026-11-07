@@ -20,10 +20,11 @@ use crate::diagnostics::{
     DocAutoCfgHideShowNoIdentBeforeValues, DocAutoCfgHideShowUnexpectedItem,
     DocAutoCfgHideShowUnexpectedItemAfterValues, DocAutoCfgHideShowValuesMix,
     DocAutoCfgWrongLiteral, DocInlineConflict, DocInlineOnlyUse, DocKeywordAttributeNotAnonConst,
-    DocKeywordNotKeyword, DocTestLiteral, DocTestTakesList, DocTestUnknown, DocUnknownAny,
-    DocUnknownInclude, DocUnknownPasses, DocUnknownPlugins, DocUnknownSpotlight,
-    DuplicateNotableTraitColor, ExpectedNameValue, ExpectedNoArgs, IllFormedAttributeInput,
-    InvalidNotableTraitAttr, InvalidNotableTraitColor, MalformedDoc, UnusedDuplicate,
+    DocKeywordNotKeyword, DocMaskedNotExternCrateSelf, DocMaskedOnlyExternCrate, DocTestLiteral,
+    DocTestTakesList, DocTestUnknown, DocUnknownAny, DocUnknownInclude, DocUnknownPasses,
+    DocUnknownPlugins, DocUnknownSpotlight, DuplicateNotableTraitColor, ExpectedNameValue,
+    ExpectedNoArgs, IllFormedAttributeInput, InvalidNotableTraitAttr, InvalidNotableTraitColor,
+    MalformedDoc, UnusedDuplicate,
 };
 use crate::parser::{
     ArgParser, MetaItemListParser, MetaItemOrLitParser, MetaItemParser, OwnedPathParser,
@@ -413,6 +414,46 @@ impl DocParser {
         }
     }
 
+    fn parse_masked(
+        &mut self,
+        cx: &mut AcceptContext<'_, '_>,
+        path: &OwnedPathParser,
+        args: &ArgParser,
+    ) {
+        if let Err(span) = args.as_no_args() {
+            expected_no_args(cx, span);
+            return;
+        }
+
+        let span = path.span();
+        self.attribute.masked = Some(span);
+
+        match cx.target {
+            Target::ExternCrate => {
+                if let AstTarget::ExternCrate(orig_name, ident) = cx.ast_target
+                    && (*orig_name == Some(kw::SelfLower)
+                        || (orig_name.is_none() && ident.name == kw::SelfLower))
+                {
+                    let item_span = cx.target_span;
+                    cx.emit_lint(
+                        INVALID_DOC_ATTRIBUTES,
+                        DocMaskedNotExternCrateSelf { attr_span: span, item_span },
+                        span,
+                    );
+                }
+            }
+            Target::Param => {} // Param has a custom error
+            _ => {
+                let item_span = cx.target_span;
+                cx.emit_lint(
+                    INVALID_DOC_ATTRIBUTES,
+                    DocMaskedOnlyExternCrate { attr_span: span, item_span },
+                    span,
+                );
+            }
+        }
+    }
+
     fn parse_cfg(&mut self, cx: &mut AcceptContext<'_, '_>, args: &ArgParser) {
         // This function replaces cases like `cfg(all())` with `true`.
         fn simplify_cfg(cfg_entry: &mut CfgEntry) {
@@ -741,7 +782,7 @@ impl DocParser {
             Some(sym::no_inline) => self.parse_inline(cx, path, args, DocInline::NoInline),
             Some(sym::masked) => {
                 gated!(doc_masked);
-                no_args!(masked)
+                self.parse_masked(cx, path, args)
             }
             Some(sym::cfg) => {
                 gated!(doc_cfg);

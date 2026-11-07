@@ -350,6 +350,27 @@ pub(crate) struct DocInlineOnlyUse {
 }
 
 #[derive(Diagnostic)]
+#[diag("this attribute can only be applied to an `extern crate` item")]
+#[note(
+    "read <https://doc.rust-lang.org/unstable-book/language-features/doc-masked.html> for more information"
+)]
+pub(crate) struct DocMaskedOnlyExternCrate {
+    #[label("only applicable on `extern crate` items")]
+    pub attr_span: Span,
+    #[label("not an `extern crate` item")]
+    pub item_span: Span,
+}
+
+#[derive(Diagnostic)]
+#[diag("this attribute cannot be applied to an `extern crate self` item")]
+pub(crate) struct DocMaskedNotExternCrateSelf {
+    #[label("not applicable on `extern crate self` items")]
+    pub attr_span: Span,
+    #[label("`extern crate self` defined here")]
+    pub item_span: Span,
+}
+
+#[derive(Diagnostic)]
 #[diag("this attribute can only be applied at the crate level")]
 #[note(
     "read <https://doc.rust-lang.org/nightly/rustdoc/the-doc-attribute.html#at-the-crate-level> for more information"

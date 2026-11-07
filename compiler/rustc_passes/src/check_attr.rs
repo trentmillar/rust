@@ -28,9 +28,8 @@ use rustc_hir::{
     ItemKind, Mod, Node, ParamName, TraitItem,
 };
 use rustc_lint_defs::builtin::{
-    CONFLICTING_REPR_HINTS, INVALID_DOC_ATTRIBUTES, MALFORMED_DIAGNOSTIC_ATTRIBUTES,
-    MALFORMED_DIAGNOSTIC_FORMAT_LITERALS, MISPLACED_DIAGNOSTIC_ATTRIBUTES, REPEATED_REPRS,
-    UNUSED_ATTRIBUTES,
+    CONFLICTING_REPR_HINTS, MALFORMED_DIAGNOSTIC_ATTRIBUTES, MALFORMED_DIAGNOSTIC_FORMAT_LITERALS,
+    MISPLACED_DIAGNOSTIC_ATTRIBUTES, REPEATED_REPRS, UNUSED_ATTRIBUTES,
 };
 use rustc_macros::Diagnostic;
 use rustc_middle::hir::nested_filter;
@@ -848,33 +847,6 @@ impl<'tcx> CheckAttrVisitor<'tcx> {
         }
     }
 
-    fn check_doc_masked(&self, span: Span, hir_id: HirId, target: Target) {
-        if target != Target::ExternCrate {
-            self.tcx.emit_node_span_lint(
-                INVALID_DOC_ATTRIBUTES,
-                hir_id,
-                span,
-                diagnostics::DocMaskedOnlyExternCrate {
-                    attr_span: span,
-                    item_span: self.tcx.hir_span(hir_id),
-                },
-            );
-            return;
-        }
-
-        if self.tcx.extern_mod_stmt_cnum(hir_id.owner.def_id).is_none() {
-            self.tcx.emit_node_span_lint(
-                INVALID_DOC_ATTRIBUTES,
-                hir_id,
-                span,
-                diagnostics::DocMaskedNotExternCrateSelf {
-                    attr_span: span,
-                    item_span: self.tcx.hir_span(hir_id),
-                },
-            );
-        }
-    }
-
     /// Runs various checks on `#[doc]` attributes.
     fn check_doc_attrs(&self, attr: &DocAttribute, hir_id: HirId, target: Target) {
         let DocAttribute {
@@ -894,7 +866,8 @@ impl<'tcx> CheckAttrVisitor<'tcx> {
             fake_variadic,
             // already checked in attr_parsing
             keyword: _,
-            masked,
+            // already checked in attr_parsing
+            masked: _,
             // FIXME: currently unchecked
             notable_trait: _,
             search_unbox,
@@ -930,10 +903,6 @@ impl<'tcx> CheckAttrVisitor<'tcx> {
 
         if let Some(span) = search_unbox {
             self.check_doc_search_unbox(*span, hir_id);
-        }
-
-        if let Some(span) = masked {
-            self.check_doc_masked(*span, hir_id, target);
         }
     }
 
